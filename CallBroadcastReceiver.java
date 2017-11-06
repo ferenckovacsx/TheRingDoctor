@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.util.Log;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 /**
@@ -20,6 +21,7 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
         String callerName = callPreferences.getString("callerName", "Unknown");
         String callerNumber = callPreferences.getString("callerNumber", "0-122-6555");
         String callerRingtone = callPreferences.getString("callerRingtone", "default");
+        Boolean vibrate = callPreferences.getBoolean("vibrate", false);
 
         Log.i("BroadcastReceiver", "alarm received");
 
@@ -28,6 +30,7 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
         callIntent.putExtra("callerName", callerName);
         callIntent.putExtra("callerNumber", callerNumber);
         callIntent.putExtra("callerRingtone", callerRingtone);
+        callIntent.putExtra("vibrate", vibrate);
         context.startActivity(callIntent);
 
         Toast.makeText(context, "Calling now", Toast.LENGTH_LONG).show();
