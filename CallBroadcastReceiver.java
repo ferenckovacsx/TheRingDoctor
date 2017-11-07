@@ -18,6 +18,7 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
 
         SharedPreferences callPreferences = context.getSharedPreferences("CALL_PREF", Context.MODE_PRIVATE);
+        String callerImageFilePath = callPreferences.getString("callerImageFilePath", "");
         String callerName = callPreferences.getString("callerName", "Unknown");
         String callerNumber = callPreferences.getString("callerNumber", "0-122-6555");
         String callerRingtone = callPreferences.getString("callerRingtone", "default");
@@ -27,13 +28,12 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
 
         Intent callIntent = new Intent(context, CallActivity.class);
         callIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        callIntent.putExtra("callerImageFilePath", callerImageFilePath);
         callIntent.putExtra("callerName", callerName);
         callIntent.putExtra("callerNumber", callerNumber);
         callIntent.putExtra("callerRingtone", callerRingtone);
         callIntent.putExtra("vibrate", vibrate);
         context.startActivity(callIntent);
-
-        Toast.makeText(context, "Calling now", Toast.LENGTH_LONG).show();
 
     }
 }

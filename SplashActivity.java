@@ -37,13 +37,13 @@ public class SplashActivity extends AppCompatActivity {
         super.onWindowFocusChanged(hasFocus);
 
 
-        ImageView rocketImage = (ImageView) findViewById(R.id.ring_animation_imageview);
-        rocketImage.setAdjustViewBounds(true);
-        rocketImage.setScaleType(ImageView.ScaleType.CENTER);
-        rocketImage.setImageDrawable(getResources().getDrawable(R.drawable.ring_animation));
+        ImageView doctorImage = (ImageView) findViewById(R.id.ring_animation_imageview);
+        doctorImage.setAdjustViewBounds(true);
+        doctorImage.setScaleType(ImageView.ScaleType.CENTER);
+        doctorImage.setImageDrawable(getResources().getDrawable(R.drawable.ring_animation));
 
-        AnimationDrawable rocketAnimation = (AnimationDrawable) rocketImage.getDrawable();
-        rocketAnimation.start();
+        AnimationDrawable ringAnimation = (AnimationDrawable) doctorImage.getDrawable();
+        ringAnimation.start();
     }
 }
 

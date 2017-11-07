@@ -12,16 +12,23 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
+
+import com.squareup.picasso.Picasso;
+
+import java.io.File;
 
 public class CallActivity extends AppCompatActivity {
 
     TextView callerNameTextView;
     TextView callerNumberTextView;
+    ImageView callerImageView;
 
     Button rejectButton;
     Button answerButton;
 
+    String callerImageFilePath;
     String callerNameString;
     String callerNumberString;
     String ringtoneUriString;
@@ -39,19 +46,23 @@ public class CallActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_call);
 
-        callerNameTextView = (TextView) findViewById(R.id.nameTextView);
-        callerNumberTextView = (TextView) findViewById(R.id.numberTextView);
+        callerImageView = findViewById(R.id.call_interface_img);
+        callerNameTextView = findViewById(R.id.nameTextView);
+        callerNumberTextView = findViewById(R.id.numberTextView);
 
-        rejectButton = (Button) findViewById(R.id.button_reject_call);
-        answerButton = (Button) findViewById(R.id.button_answer_call);
+        rejectButton = findViewById(R.id.button_reject_call);
+        answerButton = findViewById(R.id.button_answer_call);
 
+        callerImageFilePath = getIntent().getStringExtra("callerImageFilePath");
         callerNameString = getIntent().getStringExtra("callerName");
         callerNumberString = getIntent().getStringExtra("callerNumber");
         ringtoneUriString = getIntent().getStringExtra("callerRingtone");
         vibrate = getIntent().getBooleanExtra("vibrate", false);
 
-        Log.i("callActivity", "ringtoneUri: " + ringtoneUriString);
+        Log.i("callActivity", "imageFilePath: " + callerImageFilePath);
 
+        File croppedImageFile = new File(callerImageFilePath);
+        Picasso.with(this).load(croppedImageFile).transform(new CircleTransform()).into(callerImageView);
         callerNameTextView.setText(callerNameString);
         callerNumberTextView.setText(callerNumberString);
 
@@ -67,7 +78,6 @@ public class CallActivity extends AppCompatActivity {
             vibrator.vibrate(pattern, -1);
 
         }
-
 
         rejectButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {

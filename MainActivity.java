@@ -1,5 +1,6 @@
 package com.example.ferenckovacsx.theringdoctor;
 
+import android.Manifest;
 import android.app.AlarmManager;
 import android.app.Dialog;
 import android.app.PendingIntent;
@@ -7,11 +8,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
@@ -22,10 +25,20 @@ import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.MobileAds;
+import com.lyft.android.scissors.PicassoBitmapLoader;
+import com.squareup.picasso.MemoryPolicy;
+import com.squareup.picasso.Picasso;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,12 +46,14 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     ToggleButton callButton;
-    Button selectPictureButton;
+    ImageView selectPictureButton;
+    ImageView imagePlaceholder;
     EditText callerNameEdittext;
     EditText callerNumberEdittext;
     AutoCompleteTextView callRingtoneEdittext;
     AutoCompleteTextView callDelayEdittext;
     Switch vibrateSwitch;
+    AdView adview;
 
     String callerNameString;
     String callerNumberString;
@@ -51,15 +66,36 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        MobileAds.initialize(this, "ca-app-pub-3940256099942544~3347511713");
+
         final SharedPreferences callPreferences = getSharedPreferences("CALL_PREF", Context.MODE_PRIVATE);
 
-        callButton = (ToggleButton) findViewById(R.id.call_button);
-        selectPictureButton = (Button) findViewById(R.id.button_selectimage);
-        callerNameEdittext = (EditText) findViewById(R.id.inputlayout_name);
-        callerNumberEdittext = (EditText) findViewById(R.id.inputlayout_number);
-        callRingtoneEdittext = (AutoCompleteTextView) findViewById(R.id.autocomplete_ringtone);
-        callDelayEdittext = (AutoCompleteTextView) findViewById(R.id.autocomplete_delay);
-        vibrateSwitch = (Switch) findViewById(R.id.switch_vibrate);
+        callButton = findViewById(R.id.call_button);
+        selectPictureButton = findViewById(R.id.button_selectimage);
+        callerNameEdittext = findViewById(R.id.inputlayout_name);
+        callerNumberEdittext = findViewById(R.id.inputlayout_number);
+        callRingtoneEdittext = findViewById(R.id.autocomplete_ringtone);
+        callDelayEdittext = findViewById(R.id.autocomplete_delay);
+        vibrateSwitch = findViewById(R.id.switch_vibrate);
+        adview = findViewById(R.id.adView);
+        imagePlaceholder = findViewById(R.id.image_placeholder);
+
+        int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        Log.i("permissioncheck", "external: " + permissionCheck);
+
+        AdRequest adRequest = new AdRequest.Builder().build();
+        adview.loadAd(adRequest);
+
+        final String croppedImageFilePath = getIntent().getStringExtra("croppedImageUri");
+        Log.i("Mainactivity", "croppedImageFilePath: " + croppedImageFilePath);
+
+        if (croppedImageFilePath != null) {
+            File croppedImageFile = new File(croppedImageFilePath);
+            Picasso.with(this)
+                    .load(croppedImageFile)
+                    .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
+                    .into(imagePlaceholder);
+        }
 
         ArrayAdapter<String> ringtoneAutocompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, listRingtones());
 
@@ -109,6 +145,7 @@ public class MainActivity extends AppCompatActivity {
                 callPreferencesEditor.putString("callerNumber", callerNumberString);
                 callPreferencesEditor.putString("callerRingtone", getSelectedRingtoneUri(callerRingtoneString));
                 callPreferencesEditor.putString("callerDelay", getSelectedRingtoneUri(callerDelayString));
+                callPreferencesEditor.putString("callerImageFilePath", croppedImageFilePath);
                 callPreferencesEditor.putBoolean("vibrate", vibrate);
 
                 callPreferencesEditor.apply();
@@ -126,7 +163,7 @@ public class MainActivity extends AppCompatActivity {
                 dialog.setContentView(R.layout.dialog_image_source_picker);
                 dialog.setTitle("Pick an option");
 
-                Button selectCameraButton = (Button) dialog.findViewById(R.id.button_camera);
+                Button selectCameraButton = dialog.findViewById(R.id.button_camera);
                 selectCameraButton.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         Intent takePictureIntent = new Intent();
@@ -135,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 });
 
-                Button selectGalleryButton = (Button) dialog.findViewById(R.id.button_gallery);
+                Button selectGalleryButton = dialog.findViewById(R.id.button_gallery);
                 selectGalleryButton.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         //pick image from gallery
@@ -162,8 +199,6 @@ public class MainActivity extends AppCompatActivity {
         });
 
     }
-
-
 
 
     public ArrayList<String> listRingtones() {
@@ -213,14 +248,17 @@ public class MainActivity extends AppCompatActivity {
             case "Now":
                 callDelay = 0;
                 break;
-            case "3 seconds":
-                callDelay = 3000;
-                break;
             case "5 seconds":
                 callDelay = 5000;
                 break;
             case "10 seconds":
                 callDelay = 10000;
+                break;
+            case "30 seconds":
+                callDelay = 30000;
+                break;
+            case "1 minute":
+                callDelay = 60000;
                 break;
         }
 
@@ -228,25 +266,26 @@ public class MainActivity extends AppCompatActivity {
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this.getApplicationContext(), 0, intent, 0);
         AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
         alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + callDelay, pendingIntent);
-        Toast.makeText(this, "Alarm set in " + callDelay + " seconds", Toast.LENGTH_LONG).show();
+        if (callDelay == 0){
+            Toast.makeText(this, "Incoming fake call NOW!", Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, "Incoming fake call in " + callerDelayString + ".", Toast.LENGTH_SHORT).show();
+        }
     }
 
-//    @Override
-//    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-//        super.onActivityResult(requestCode, resultCode, data);
-//
-//        if (requestCode == 1 && resultCode == RESULT_OK && data != null && data.getData() != null) {
-//
-//            Uri uri = data.getData();
-//
-//            try {
-//                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), uri);
-//                ImageView imageView = (ImageView) findViewById(R.id.rawImageViewMain);
-//                imageView.setImageBitmap(bitmap);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == 1 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+
+            Uri uri = data.getData();
+
+            Intent cropImageIntent = new Intent(MainActivity.this, CropImageActivity.class);
+            cropImageIntent.putExtra("imageUri", uri.toString());
+            startActivity(cropImageIntent);
+
+        }
+    }
 }
 
