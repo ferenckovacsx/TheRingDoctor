@@ -32,10 +32,12 @@ public class CallActivity extends AppCompatActivity {
 
     TextView rejectButton;
     TextView answerButton;
+    TextView endCallButton;
 
     String callerImageFilePath;
     String callerNameString;
     String callerNumberString;
+    String callerVoiceString;
     String ringtoneUriString;
     Boolean vibrate;
 
@@ -69,15 +71,19 @@ public class CallActivity extends AppCompatActivity {
 
         rejectButton = findViewById(R.id.button_reject_call);
         answerButton = findViewById(R.id.button_answer_call);
+        endCallButton = findViewById(R.id.button_end_call);
+        endCallButton.setVisibility(View.INVISIBLE);
 
         callerImageFilePath = getIntent().getStringExtra("callerImageFilePath");
         callerNameString = getIntent().getStringExtra("callerName");
         callerNumberString = getIntent().getStringExtra("callerNumber");
+        callerVoiceString = getIntent().getStringExtra("callerVoice");
         ringtoneUriString = getIntent().getStringExtra("callerRingtone");
         vibrate = getIntent().getBooleanExtra("vibrate", false);
 
         Log.i("callActivity", "imageFilePath: " + callerImageFilePath);
         Log.i("callActivity", "callerName: " + callerNameString);
+        Log.i("callActivity", "callerVoice: " + callerVoiceString);
 
         File croppedImageFile = new File(callerImageFilePath);
 
@@ -129,24 +135,42 @@ public class CallActivity extends AppCompatActivity {
             }
         });
 
+        endCallButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+
+
+                mediaPlayer.stop();
+                vibrator.cancel();
+                currentRingtone.stop();
+                finish();
+
+            }
+        });
+
         answerButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
 
                 vibrator.cancel();
                 currentRingtone.stop();
+                endCallButton.setVisibility(View.VISIBLE);
+                rejectButton.setVisibility(View.INVISIBLE);
+                answerButton.setVisibility(View.INVISIBLE);
 
-                try {
-                    if (!mediaPlayer.isPlaying()) {
-                        AssetFileDescriptor afd = getAssets().openFd("lost_cat_audio.mp3");
-                        mediaPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
-                        mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
-                        mediaPlayer.prepare();
-                        mediaPlayer.start();
+                if (!callerVoiceString.equals("None") || !callerVoiceString.equals("")) {
+                    try {
+                        if (!mediaPlayer.isPlaying()) {
+                            AssetFileDescriptor afd = getAssets().openFd(callerVoiceString + ".mp3");
+                            mediaPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
+                            mediaPlayer.setDataSource(afd.getFileDescriptor(), afd.getStartOffset(), afd.getLength());
+                            mediaPlayer.prepare();
+                            mediaPlayer.start();
+                        }
+
+                    } catch (IOException e) {
+                        e.printStackTrace();
                     }
-
-                } catch (IOException e) {
-                    e.printStackTrace();
                 }
+
 
             }
         });

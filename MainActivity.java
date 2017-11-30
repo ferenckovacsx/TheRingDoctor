@@ -2,8 +2,11 @@ package com.example.ferenckovacsx.theringdoctor;
 
 import android.Manifest;
 import android.app.AlarmManager;
+import android.app.Dialog;
 import android.app.PendingIntent;
+import android.app.TimePickerDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
@@ -26,6 +29,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Switch;
+import android.widget.TimePicker;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
@@ -38,7 +42,9 @@ import com.squareup.picasso.Picasso;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -47,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
     ImageView imagePlaceholder;
     EditText nameAutoCompleteTextView;
     EditText numberAutoCompleteTextView;
-    AutoCompleteTextView callerVoice;
+    AutoCompleteTextView callerVoiceTextView;
     AutoCompleteTextView ringtoneAutoCompleteTextView;
     AutoCompleteTextView delayAutoCompleteTextView;
     Switch vibrateSwitch;
@@ -56,8 +62,12 @@ public class MainActivity extends AppCompatActivity {
     String callerNameString;
     String callerNumberString;
     String callerRingtoneString;
+    String callerVoiceString;
     String callerDelayString;
     Boolean vibrate;
+
+    int customSelectedHour;
+    int customSelectedMinute;
 
     String callerRingtoneUriString;
 
@@ -83,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
         selectPictureButton = findViewById(R.id.button_selectimage);
         nameAutoCompleteTextView = findViewById(R.id.inputlayout_name);
         numberAutoCompleteTextView = findViewById(R.id.inputlayout_number);
-        callerVoice = findViewById(R.id.inputlayout_callervoice);
+        callerVoiceTextView = findViewById(R.id.inputlayout_callervoice);
         ringtoneAutoCompleteTextView = findViewById(R.id.autocomplete_ringtone);
         delayAutoCompleteTextView = findViewById(R.id.autocomplete_delay);
         vibrateSwitch = findViewById(R.id.switch_vibrate);
@@ -110,9 +120,9 @@ public class MainActivity extends AppCompatActivity {
         List<String> callerVoiceList = Arrays.asList(getResources().getStringArray(R.array.caller_voice_array));
         ArrayAdapter<String> callerVoiceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, callerVoiceList);
 
-        callerVoice.setAdapter(callerVoiceAdapter);
-        callerVoice.setKeyListener(null);
-        callerVoice.setOnTouchListener(new View.OnTouchListener() {
+        callerVoiceTextView.setAdapter(callerVoiceAdapter);
+        callerVoiceTextView.setKeyListener(null);
+        callerVoiceTextView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 ((AutoCompleteTextView) v).showDropDown();
@@ -123,6 +133,29 @@ public class MainActivity extends AppCompatActivity {
 
 
         });
+
+//        callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
+//                dialog.setContentView(R.layout.dialog_try_for_free);
+//                dialog.setTitle("Title...");
+//
+//                TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
+//                TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
+//                ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
+//
+//                cancelIv.setOnClickListener(new View.OnClickListener() {
+//                    @Override
+//                    public void onClick(View v) {
+//                        dialog.dismiss();
+//                    }
+//                });
+//
+//                dialog.show();
+//            }
+//        });
+
 
         ArrayAdapter<String> ringtoneAutocompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, listRingtones());
 
@@ -149,15 +182,8 @@ public class MainActivity extends AppCompatActivity {
                     Intent pickAudioIntent = new Intent();
                     pickAudioIntent.setType("audio/*");
                     pickAudioIntent.setAction(Intent.ACTION_GET_CONTENT);
-                    startActivityForResult(Intent.createChooser(pickAudioIntent, "Select ringtone audio file"), 2);
+                    startActivityForResult(Intent.createChooser(pickAudioIntent, "Select from file..."), 2);
                 }
-
-
-                int pos = Arrays.asList(listRingtones()).indexOf(selected);
-                Log.i("autocomplete_itemclick", "selected: " + selected);
-                Log.i("autocomplete_itemclick", "pos: " + pos);
-
-
             }
         });
 
@@ -179,6 +205,39 @@ public class MainActivity extends AppCompatActivity {
 
         });
 
+        delayAutoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                String selected = (String) parent.getItemAtPosition(position);
+                Calendar mcurrentTime = Calendar.getInstance();
+                int hour = mcurrentTime.get(Calendar.HOUR_OF_DAY);
+                int minute = mcurrentTime.get(Calendar.MINUTE);
+                if (selected.equals(getResources().getString(R.string.custom_time))) {
+
+                    final TimePickerDialog timePicker;
+                    timePicker = new TimePickerDialog(MainActivity.this, new TimePickerDialog.OnTimeSetListener() {
+                        @Override
+                        public void onTimeSet(TimePicker timePicker, int selectedHour, int selectedMinute) {
+                            customSelectedHour = selectedHour;
+                            customSelectedMinute = selectedMinute;
+
+                            String currentTimeString = String.format(Locale.US, "%02d:%02d", selectedHour, selectedMinute);
+                            delayAutoCompleteTextView.setText(currentTimeString, false);
+                        }
+                    }, hour, minute, true);
+                    timePicker.setTitle("Select Time");
+                    timePicker.setCancelable(false);
+                    timePicker.setCanceledOnTouchOutside(false);
+                    timePicker.setOnShowListener(new DialogInterface.OnShowListener() {
+                        @Override
+                        public void onShow(DialogInterface dialog) {
+                            timePicker.getButton(Dialog.BUTTON_NEGATIVE).setVisibility(View.GONE);
+                        }
+                    });
+                    timePicker.show();
+                }
+            }
+        });
 
         callButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -188,13 +247,14 @@ public class MainActivity extends AppCompatActivity {
                     callerNumberString = numberAutoCompleteTextView.getText().toString();
                     callerRingtoneString = ringtoneAutoCompleteTextView.getText().toString();
                     callerDelayString = delayAutoCompleteTextView.getText().toString();
+                    callerVoiceString = callerVoiceTextView.getText().toString();
                     vibrate = vibrateSwitch.isChecked();
 
                     SharedPreferences.Editor callPreferencesEditor = callPreferences.edit();
                     callPreferencesEditor.putString("callerName", callerNameString);
                     callPreferencesEditor.putString("callerNumber", callerNumberString);
+                    callPreferencesEditor.putString("callerVoice", callerVoiceString);
                     callPreferencesEditor.putString("callerRingtone", getSelectedRingtoneUri(callerRingtoneString));
-//                    callPreferencesEditor.putString("callerRingtone", callerRingtoneUriString);
                     callPreferencesEditor.putString("callerImageFilePath", croppedImageFilePath);
                     callPreferencesEditor.putBoolean("vibrate", vibrate);
 
@@ -220,10 +280,7 @@ public class MainActivity extends AppCompatActivity {
                 pickFromGalleryIntent.setAction(Intent.ACTION_GET_CONTENT);
                 startActivityForResult(Intent.createChooser(pickFromGalleryIntent, "Select Picture"), 1);
             }
-//                });
 
-//                dialog.show();
-//            }
         });
 
         vibrateSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -271,7 +328,7 @@ public class MainActivity extends AppCompatActivity {
 
         RingtoneManager manager = new RingtoneManager(this);
 
-        Uri selectedRingtoneUri = manager.getActualDefaultRingtoneUri(getApplicationContext(), RingtoneManager.TYPE_RINGTONE);
+        Uri selectedRingtoneUri;
 
         if (selectedRingtone.equals("Default") || selectedRingtone.equals("")) {
             selectedRingtoneUri = manager.getActualDefaultRingtoneUri(getApplicationContext(), RingtoneManager.TYPE_RINGTONE);
@@ -300,30 +357,45 @@ public class MainActivity extends AppCompatActivity {
 
         if (isActivated) {
 
-            int callDelay = 0;
+            Long triggerTime;
 
             switch (callerDelayString) {
                 case "Now":
-                    callDelay = 0;
+                    triggerTime = System.currentTimeMillis();
                     break;
                 case "5 seconds":
-                    callDelay = 5000;
+                    triggerTime = System.currentTimeMillis() + 5000L;
                     break;
                 case "10 seconds":
-                    callDelay = 10000;
+                    triggerTime = System.currentTimeMillis() + 10000L;
                     break;
                 case "30 seconds":
-                    callDelay = 30000;
+                    triggerTime = System.currentTimeMillis() + 30000L;
                     break;
                 case "1 minute":
-                    callDelay = 60000;
+                    triggerTime = System.currentTimeMillis() + 60000L;
                     break;
+                case "10 minutes":
+                    triggerTime = System.currentTimeMillis() + 100000L;
+                    break;
+                default:
+
+                    Calendar calendar = Calendar.getInstance();
+                    calendar.set(Calendar.HOUR_OF_DAY, customSelectedHour);
+                    calendar.set(Calendar.MINUTE, customSelectedMinute);
+                    calendar.set(Calendar.SECOND, 0);
+
+                    triggerTime = calendar.getTimeInMillis();
+                    //triggerTime = calendarTimeMillis - System.currentTimeMillis();
+
+                    Log.i("custom time", "delay: " + triggerTime);
+
             }
 
             PendingIntent pendingIntent = PendingIntent.getBroadcast(this.getApplicationContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT);
             AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
-            alarmManager.set(AlarmManager.RTC_WAKEUP, System.currentTimeMillis() + callDelay, pendingIntent);
-            if (callDelay == 0) {
+            alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
+            if (triggerTime == 0) {
                 Toast.makeText(this, "Incoming fake call NOW!", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Incoming fake call in " + callerDelayString + ".", Toast.LENGTH_SHORT).show();

@@ -21,6 +21,7 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
         String callerImageFilePath = callPreferences.getString("callerImageFilePath", "");
         String callerName = callPreferences.getString("callerName", "Unknown");
         String callerNumber = callPreferences.getString("callerNumber", "0-122-6555");
+        String callerVoice = callPreferences.getString("callerVoice", "none");
         String callerRingtone = callPreferences.getString("callerRingtone", "default");
         Boolean vibrate = callPreferences.getBoolean("vibrate", false);
 
@@ -31,6 +32,7 @@ public class CallBroadcastReceiver extends BroadcastReceiver {
         callIntent.putExtra("callerImageFilePath", callerImageFilePath);
         callIntent.putExtra("callerName", callerName);
         callIntent.putExtra("callerNumber", callerNumber);
+        callIntent.putExtra("callerVoice", callerVoice);
         callIntent.putExtra("callerRingtone", callerRingtone);
         callIntent.putExtra("vibrate", vibrate);
         context.startActivity(callIntent);
