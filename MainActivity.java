@@ -29,6 +29,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Switch;
+import android.widget.TextView;
 import android.widget.TimePicker;
 import android.widget.Toast;
 import android.widget.ToggleButton;
@@ -39,12 +40,23 @@ import com.google.android.gms.ads.MobileAds;
 import com.squareup.picasso.MemoryPolicy;
 import com.squareup.picasso.Picasso;
 
+import org.w3c.dom.Text;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
+
+import io.trialy.library.Trialy;
+import io.trialy.library.TrialyCallback;
+
+import static io.trialy.library.Constants.STATUS_TRIAL_JUST_ENDED;
+import static io.trialy.library.Constants.STATUS_TRIAL_JUST_STARTED;
+import static io.trialy.library.Constants.STATUS_TRIAL_NOT_YET_STARTED;
+import static io.trialy.library.Constants.STATUS_TRIAL_OVER;
+import static io.trialy.library.Constants.STATUS_TRIAL_RUNNING;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -75,12 +87,17 @@ public class MainActivity extends AppCompatActivity {
 
     Intent intent;
 
+    Trialy mTrialy;
+    String trialStatus;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mTrialy = new Trialy(this, "TW9RRQYD69UTQ2OKR0T");
+        mTrialy.checkTrial("default", mTrialyCallback);
+        
         MobileAds.initialize(this, "ca-app-pub-3940256099942544~3347511713");
 
         final SharedPreferences callPreferences = getSharedPreferences("CALL_PREF", Context.MODE_PRIVATE);
@@ -134,27 +151,69 @@ public class MainActivity extends AppCompatActivity {
 
         });
 
-//        callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
-//                dialog.setContentView(R.layout.dialog_try_for_free);
-//                dialog.setTitle("Title...");
-//
-//                TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
-//                TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
-//                ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
-//
-//                cancelIv.setOnClickListener(new View.OnClickListener() {
-//                    @Override
-//                    public void onClick(View v) {
-//                        dialog.dismiss();
-//                    }
-//                });
-//
-//                dialog.show();
-//            }
-//        });
+        Log.i("trialStatus", "String" + trialStatus);
+        if (trialStatus.equals("ended")) {
+
+            callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
+                    dialog.setContentView(R.layout.dialog_try_for_free);
+                    dialog.setTitle("Title...");
+
+                    TextView trialInfoTv = dialog.findViewById(R.id.trial_info);
+                    TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
+                    TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
+                    ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
+
+                    tryForFreeTv.setVisibility(View.INVISIBLE);
+                    trialInfoTv.setText(getResources().getText(R.string.trial_ended));
+
+                    cancelIv.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            dialog.dismiss();
+                        }
+                    });
+
+                    dialog.show();
+                }
+            });
+        }
+
+        if (trialStatus.equals("not_started") || trialStatus.equals("")) {
+
+            callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
+                    dialog.setContentView(R.layout.dialog_try_for_free);
+                    dialog.setTitle("Title...");
+
+                    TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
+                    TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
+                    ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
+
+
+                    tryForFreeTv.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            mTrialy.startTrial("default", mTrialyCallback);
+                            dialog.dismiss();
+                        }
+                    });
+
+                    cancelIv.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            dialog.dismiss();
+                        }
+                    });
+
+                    dialog.show();
+                }
+            });
+        }
 
 
         ArrayAdapter<String> ringtoneAutocompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, listRingtones());
@@ -208,6 +267,8 @@ public class MainActivity extends AppCompatActivity {
         delayAutoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                mTrialy.clearLocalCache("_test");
+
                 String selected = (String) parent.getItemAtPosition(position);
                 Calendar mcurrentTime = Calendar.getInstance();
                 int hour = mcurrentTime.get(Calendar.HOUR_OF_DAY);
@@ -296,6 +357,31 @@ public class MainActivity extends AppCompatActivity {
             }
         });
     }
+
+    private TrialyCallback mTrialyCallback = new TrialyCallback() {
+        @Override
+        public void onResult(int status, long timeRemaining, String sku) {
+            switch (status) {
+                case STATUS_TRIAL_JUST_STARTED:
+                    trialStatus = "active";
+                    break;
+                case STATUS_TRIAL_RUNNING:
+                    trialStatus = "active";
+                    break;
+                case STATUS_TRIAL_JUST_ENDED:
+                    trialStatus = "ended";
+                    break;
+                case STATUS_TRIAL_NOT_YET_STARTED:
+                    trialStatus = "not_started";
+                    break;
+                case STATUS_TRIAL_OVER:
+                    trialStatus = "ended";
+                    break;
+            }
+            Log.i("TRIALY", "Returned status: " + Trialy.getStatusMessage(status));
+        }
+
+    };
 
     @Override
     protected void onResume() {
