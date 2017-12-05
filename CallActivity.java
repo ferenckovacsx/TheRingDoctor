@@ -24,6 +24,13 @@ import com.squareup.picasso.Picasso;
 import java.io.File;
 import java.io.IOException;
 
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerNameTag;
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerNumberTag;
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerRingtoneTag;
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerRingtoneUriTag;
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerVibrateTag;
+import static com.example.ferenckovacsx.theringdoctor.MainActivity.callerVoiceTag;
+
 public class CallActivity extends AppCompatActivity {
 
     TextView callerNameTextView;
@@ -75,11 +82,11 @@ public class CallActivity extends AppCompatActivity {
         endCallButton.setVisibility(View.INVISIBLE);
 
         callerImageFilePath = getIntent().getStringExtra("callerImageFilePath");
-        callerNameString = getIntent().getStringExtra("callerName");
-        callerNumberString = getIntent().getStringExtra("callerNumber");
-        callerVoiceString = getIntent().getStringExtra("callerVoice");
-        ringtoneUriString = getIntent().getStringExtra("callerRingtone");
-        vibrate = getIntent().getBooleanExtra("vibrate", false);
+        callerNameString = getIntent().getStringExtra(callerNameTag);
+        callerNumberString = getIntent().getStringExtra(callerNumberTag);
+        callerVoiceString = getIntent().getStringExtra(callerVoiceTag);
+        ringtoneUriString = getIntent().getStringExtra(callerRingtoneUriTag);
+        vibrate = getIntent().getBooleanExtra(callerVibrateTag, false);
 
         Log.i("callActivity", "imageFilePath: " + callerImageFilePath);
         Log.i("callActivity", "callerName: " + callerNameString);

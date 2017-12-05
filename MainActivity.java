@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -34,13 +35,15 @@ import android.widget.TimePicker;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.example.ferenckovacsx.theringdoctor.util.IabHelper;
+import com.example.ferenckovacsx.theringdoctor.util.IabResult;
+import com.example.ferenckovacsx.theringdoctor.util.Inventory;
+import com.example.ferenckovacsx.theringdoctor.util.Purchase;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdView;
 import com.google.android.gms.ads.MobileAds;
 import com.squareup.picasso.MemoryPolicy;
 import com.squareup.picasso.Picasso;
-
-import org.w3c.dom.Text;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -63,11 +66,12 @@ public class MainActivity extends AppCompatActivity {
     ToggleButton callButton;
     ImageView selectPictureButton;
     ImageView imagePlaceholder;
-    EditText nameAutoCompleteTextView;
-    EditText numberAutoCompleteTextView;
-    AutoCompleteTextView callerVoiceTextView;
-    AutoCompleteTextView ringtoneAutoCompleteTextView;
-    AutoCompleteTextView delayAutoCompleteTextView;
+    EditText nameTv;
+    EditText numberTv;
+    AutoCompleteTextView voiceACTv;
+    AutoCompleteTextView ringtoneACTv;
+    AutoCompleteTextView delayACTv;
+    TextView vibrateTv;
     Switch vibrateSwitch;
     AdView adview;
 
@@ -78,50 +82,113 @@ public class MainActivity extends AppCompatActivity {
     String callerDelayString;
     Boolean vibrate;
 
+    public static final String callerNameTag = "CALLER_NAME_TAG";
+    public static final String callerNumberTag = "CALLER_NUMBER_TAG";
+    public static final String callerRingtoneTag = "CALLER_RINGTONE_TAG";
+    public static final String callerRingtoneUriTag = "CALLER_RINGTONE_URI_TAG";
+    public static final String callerVoiceTag = "CALLER_VOICE_TAG";
+    public static final String callerDelayTag = "CALLER_DELAY_TAG";
+    public static final String callerVibrateTag = "CALLER_VIBRATE_TAG";
+
     int customSelectedHour;
     int customSelectedMinute;
 
     String callerRingtoneUriString;
+    String voiceUriString;
 
-    Boolean isActivated;
+    Boolean isRingerActivated;
+    Boolean isPremium = false;
+    Boolean isTrialActive = false;
 
-    Intent intent;
+    Intent ringerIntent;
+    SharedPreferences callPreferences;
 
     Trialy mTrialy;
-    String trialStatus;
+    IabHelper mHelper;
+
+    final String base64EncodedPublicKey = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAq2f2oIb3qEXhhK5zb8gAV61Vg7ovE0HOQ1UpdYy/qk8sOUirht94cGZHu2Tj3NDwDT2cUiCWNIgriAJW4KLCUe8jV2rBGJjV04jyCiZkACEMNGJ+hrAUQaVzgFeclcvml4HUdXmLEvBmp8pAAaVrhC3cK+8RTni0dk7oyIJN7NunWvxLs7A77nYzp/CkA/eA/Godb6vDBXH3pu9QW6/LfvqfxjVuQDmexYCEZPialI7hTAHxBeqVKfjS4cJyqbYgwW4ETu/Yxzi0M8icAIS/V2+LhftQ5PXpZvtKyXMlVqWGKPMmU0/NbR+da0DQ9Jg0Mp0uIXuI/7FTMM/h9XBRGwIDAQAB";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mTrialy = new Trialy(this, "TW9RRQYD69UTQ2OKR0T");
-        mTrialy.checkTrial("default", mTrialyCallback);
-        
-        MobileAds.initialize(this, "ca-app-pub-3940256099942544~3347511713");
+        if (savedInstanceState != null) {
+            Log.i("MAIN", "savedInstanceState not null");
+        } else {
+            Log.i("MAIN", "savedInstanceState IS null");
+        }
 
-        final SharedPreferences callPreferences = getSharedPreferences("CALL_PREF", Context.MODE_PRIVATE);
 
-        intent = new Intent(this.getApplicationContext(), CallBroadcastReceiver.class);
-        isActivated = (PendingIntent.getBroadcast(this.getApplicationContext(), 0, intent, PendingIntent.FLAG_NO_CREATE) != null);//just changed the flag
-        Log.d("mainact", "alarm is " + (isActivated ? "" : "not") + " working...");
+        callPreferences = getSharedPreferences("CALL_PREF", Context.MODE_PRIVATE);
 
+        ringerIntent = new Intent(this.getApplicationContext(), CallBroadcastReceiver.class);
+        isRingerActivated = (PendingIntent.getBroadcast(this.getApplicationContext(), 0, ringerIntent, PendingIntent.FLAG_NO_CREATE) != null);//just changed the flag
+        Log.d("mainact", "alarm is " + (isRingerActivated ? "" : "not") + " working...");
+
+
+        //UI ELEMENTS
         callButton = findViewById(R.id.call_button);
         selectPictureButton = findViewById(R.id.button_selectimage);
-        nameAutoCompleteTextView = findViewById(R.id.inputlayout_name);
-        numberAutoCompleteTextView = findViewById(R.id.inputlayout_number);
-        callerVoiceTextView = findViewById(R.id.inputlayout_callervoice);
-        ringtoneAutoCompleteTextView = findViewById(R.id.autocomplete_ringtone);
-        delayAutoCompleteTextView = findViewById(R.id.autocomplete_delay);
+        nameTv = findViewById(R.id.inputlayout_name);
+        numberTv = findViewById(R.id.inputlayout_number);
+        voiceACTv = findViewById(R.id.inputlayout_callervoice);
+        ringtoneACTv = findViewById(R.id.autocomplete_ringtone);
+        delayACTv = findViewById(R.id.autocomplete_delay);
+        vibrateTv = findViewById(R.id.switch_vibrate_text);
         vibrateSwitch = findViewById(R.id.switch_vibrate);
         adview = findViewById(R.id.adView);
         imagePlaceholder = findViewById(R.id.image_placeholder);
 
+        //get saved data (if there is any)
+        callerNameString = callPreferences.getString(callerNameTag, null);
+        callerNumberString = callPreferences.getString(callerNumberTag, null);
+        callerVoiceString = callPreferences.getString(callerVoiceTag, null);
+        callerRingtoneString = callPreferences.getString(callerRingtoneTag, null);
+        callerDelayString = callPreferences.getString(callerDelayTag, null);
+        vibrate = callPreferences.getBoolean(callerVibrateTag, false);
+
+        //update UI with saved data
+        nameTv.setText(callerNameString);
+        numberTv.setText(callerNumberString);
+        voiceACTv.setText(callerVoiceString);
+        ringtoneACTv.setText(callerRingtoneString);
+        delayACTv.setText(callerDelayString);
+        vibrateSwitch.setChecked(vibrate);
+
+        //
+        if (vibrateSwitch.isChecked()) {
+            vibrateTv.setTextColor(Color.parseColor("#1874A8"));
+            vibrateTv.setTypeface(null, Typeface.NORMAL);
+        } else {
+            final ColorStateList hintColor = nameTv.getHintTextColors();
+            vibrateTv.setTextColor(hintColor);
+            vibrateTv.setTypeface(null, Typeface.ITALIC);
+        }
+
+        //TRIALY SETUP
+        mTrialy = new Trialy(this, "TW9RRQYD69UTQ2OKR0T");
+        mTrialy.checkTrial("default", mTrialyCallback);
+
+        //AD BANNER SETUP
+        MobileAds.initialize(this, "ca-app-pub-3940256099942544~3347511713");
+        AdRequest adRequest = new AdRequest.Builder().build();
+        adview.loadAd(adRequest);
+
+        //IN-APP BILLING SETUP
+        mHelper = new IabHelper(this, base64EncodedPublicKey);
+        mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
+            public void onIabSetupFinished(IabResult result) {
+                if (!result.isSuccess()) {
+                    // Oh no, there was a problem.
+                    Log.d("IabHelper", "Problem setting up In-app Billing: " + result);
+                }
+            }
+        });
+
         int permissionCheck = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
         Log.i("permissioncheck", "external: " + permissionCheck);
 
-        AdRequest adRequest = new AdRequest.Builder().build();
-        adview.loadAd(adRequest);
 
         final String croppedImageFilePath = getIntent().getStringExtra("croppedImageUri");
         Log.i("Mainactivity", "croppedImageFilePath: " + croppedImageFilePath);
@@ -134,61 +201,131 @@ public class MainActivity extends AppCompatActivity {
                     .into(imagePlaceholder);
         }
 
-        List<String> callerVoiceList = Arrays.asList(getResources().getStringArray(R.array.caller_voice_array));
-        ArrayAdapter<String> callerVoiceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, callerVoiceList);
+        Log.i("trial", "current status: " + isTrialActive);
 
-        callerVoiceTextView.setAdapter(callerVoiceAdapter);
-        callerVoiceTextView.setKeyListener(null);
-        callerVoiceTextView.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-                ((AutoCompleteTextView) v).showDropDown();
-                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
-                return false;
+        mHelper.startSetup(new IabHelper.OnIabSetupFinishedListener() {
+            public void onIabSetupFinished(IabResult result) {
+                Log.d("IAB_setup", "Setup finished.");
+
+                if (!result.isSuccess()) {
+                    // Oh noes, there was a problem.
+                    Log.d("IAB_setup", "Problem setting up in-app billing: " + result);
+                    return;
+                }
+
+                // Have we been disposed of in the meantime? If so, quit.
+                if (mHelper == null) return;
+
+                // IAB is fully set up. Now, let's get an inventory of stuff we own.
+                Log.d("IAB_setup", "Setup successful. Querying inventory.");
+                try {
+                    mHelper.queryInventoryAsync(mGotInventoryListener);
+                } catch (IabHelper.IabAsyncInProgressException e) {
+                    Log.d("IAB_setup", "Error querying inventory. Another async operation in progress.");
+                }
             }
-
-
         });
 
-        Log.i("trialStatus", "String" + trialStatus);
-        if (trialStatus.equals("ended")) {
-
-            callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
-                    dialog.setContentView(R.layout.dialog_try_for_free);
-                    dialog.setTitle("Title...");
-
-                    TextView trialInfoTv = dialog.findViewById(R.id.trial_info);
-                    TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
-                    TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
-                    ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
-
-                    tryForFreeTv.setVisibility(View.INVISIBLE);
-                    trialInfoTv.setText(getResources().getText(R.string.trial_ended));
-
-                    cancelIv.setOnClickListener(new View.OnClickListener() {
-                        @Override
-                        public void onClick(View v) {
-                            dialog.dismiss();
+        //Premium user or trial is active
+        if (isTrialActive != null) {
+            if (isTrialActive || isPremium) {
+                List<String> callerVoiceList = Arrays.asList(getResources().getStringArray(R.array.caller_voice_array));
+                final ArrayAdapter<String> callerVoiceAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, callerVoiceList) {
+                    @Override
+                    public boolean isEnabled(int position) {
+                        if (position == 2) {
+                            return false;
                         }
-                    });
+                        return true;
+                    }
+                };
 
-                    dialog.show();
-                }
-            });
+                voiceACTv.setAdapter(callerVoiceAdapter);
+                voiceACTv.setKeyListener(null);
+                voiceACTv.setOnTouchListener(new View.OnTouchListener() {
+                    @Override
+                    public boolean onTouch(View v, MotionEvent event) {
+                        ((AutoCompleteTextView) v).showDropDown();
+                        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                        imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
+                        return false;
+                    }
+
+
+                });
+
+                voiceACTv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                        String selected = (String) parent.getItemAtPosition(position);
+
+                        Log.i("voiceACTV", "onItemClick pos: " + selected);
+
+                        if (selected.equals("Select from device")) {
+
+                            Intent pickAudioIntent = new Intent();
+                            pickAudioIntent.setType("audio/*");
+                            pickAudioIntent.setAction(Intent.ACTION_GET_CONTENT);
+                            startActivityForResult(Intent.createChooser(pickAudioIntent, "Select from file..."), 3);
+                        }
+                    }
+                });
+            }
+
+            //Trial period has ended and not premium user
+            if (!isTrialActive && !isPremium) {
+
+                voiceACTv.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
+                        dialog.setContentView(R.layout.dialog_try_for_free);
+
+                        TextView trialInfoTv = dialog.findViewById(R.id.trial_info);
+                        TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
+                        TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
+                        TextView upgradeTvCenter = dialog.findViewById(R.id.upgradeTextViewCenter);
+                        ImageView cancelIv = dialog.findViewById(R.id.cancelImageView);
+
+                        tryForFreeTv.setVisibility(View.GONE);
+                        upgradeTv.setVisibility(View.GONE);
+                        upgradeTvCenter.setVisibility(View.VISIBLE);
+                        trialInfoTv.setText(getResources().getText(R.string.trial_ended));
+
+                        upgradeTvCenter.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                try {
+                                    mHelper.launchPurchaseFlow(MainActivity.this, "voice_call_pack", 10001,
+                                            mPurchaseFinishedListener, "bGoa+V7g/yqDXvKRqq+JTFn4uQZbPiQJo4pf9RzJ");
+                                } catch (IabHelper.IabAsyncInProgressException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                        });
+
+                        cancelIv.setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                dialog.dismiss();
+                            }
+                        });
+
+                        dialog.show();
+                    }
+                });
+            }
         }
 
-        if (trialStatus.equals("not_started") || trialStatus.equals("")) {
 
-            callerVoiceTextView.setOnClickListener(new View.OnClickListener() {
+        //No premium user. Trial not started yet
+        if (isTrialActive == null && !isPremium) {
+
+            voiceACTv.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     final Dialog dialog = new Dialog(MainActivity.this, R.style.Theme_AppCompat);
                     dialog.setContentView(R.layout.dialog_try_for_free);
-                    dialog.setTitle("Title...");
 
                     TextView tryForFreeTv = dialog.findViewById(R.id.tryForFreeTextview);
                     TextView upgradeTv = dialog.findViewById(R.id.upgradeTextView);
@@ -203,6 +340,19 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
 
+                    upgradeTv.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            try {
+                                mHelper.launchPurchaseFlow(MainActivity.this, "voice_call_pack", 10001,
+                                        mPurchaseFinishedListener, "bGoa+V7g/yqDXvKRqq+JTFn4uQZbPiQJo4pf9RzJ");
+                            } catch (IabHelper.IabAsyncInProgressException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+
+
                     cancelIv.setOnClickListener(new View.OnClickListener() {
                         @Override
                         public void onClick(View v) {
@@ -216,11 +366,19 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-        ArrayAdapter<String> ringtoneAutocompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, listRingtones());
+        ArrayAdapter<String> ringtoneAutocompleteAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, listRingtones()) {
+            @Override
+            public boolean isEnabled(int position) {
+                if (position == 2) {
+                    return false;
+                }
+                return true;
+            }
+        };
 
-        ringtoneAutoCompleteTextView.setAdapter(ringtoneAutocompleteAdapter);
-        ringtoneAutoCompleteTextView.setKeyListener(null);
-        ringtoneAutoCompleteTextView.setOnTouchListener(new View.OnTouchListener() {
+        ringtoneACTv.setAdapter(ringtoneAutocompleteAdapter);
+        ringtoneACTv.setKeyListener(null);
+        ringtoneACTv.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
@@ -232,7 +390,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        ringtoneAutoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        ringtoneACTv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 String selected = (String) parent.getItemAtPosition(position);
@@ -248,11 +406,20 @@ public class MainActivity extends AppCompatActivity {
 
 
         List<String> delaysArraylist = Arrays.asList(getResources().getStringArray(R.array.delay_intervals));
-        ArrayAdapter<String> delayAutocompleteAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, delaysArraylist);
+        ArrayAdapter<String> delayAutocompleteAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, delaysArraylist) {
+            @Override
+            public boolean isEnabled(int position) {
+                if (position == 1) {
+                    return false;
+                }
+                return true;
+            }
+        };
 
-        delayAutoCompleteTextView.setAdapter(delayAutocompleteAdapter);
-        delayAutoCompleteTextView.setKeyListener(null);
-        delayAutoCompleteTextView.setOnTouchListener(new View.OnTouchListener() {
+        delayACTv.setAdapter(delayAutocompleteAdapter);
+        delayACTv.setKeyListener(null);
+        delayACTv.setOnTouchListener(new View.OnTouchListener() {
+
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 ((AutoCompleteTextView) v).showDropDown();
@@ -260,14 +427,11 @@ public class MainActivity extends AppCompatActivity {
                 imm.hideSoftInputFromWindow(getWindow().getCurrentFocus().getWindowToken(), 0);
                 return false;
             }
-
-
         });
 
-        delayAutoCompleteTextView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        delayACTv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                mTrialy.clearLocalCache("_test");
 
                 String selected = (String) parent.getItemAtPosition(position);
                 Calendar mcurrentTime = Calendar.getInstance();
@@ -283,7 +447,7 @@ public class MainActivity extends AppCompatActivity {
                             customSelectedMinute = selectedMinute;
 
                             String currentTimeString = String.format(Locale.US, "%02d:%02d", selectedHour, selectedMinute);
-                            delayAutoCompleteTextView.setText(currentTimeString, false);
+                            delayACTv.setText(currentTimeString, false);
                         }
                     }, hour, minute, true);
                     timePicker.setTitle("Select Time");
@@ -303,30 +467,31 @@ public class MainActivity extends AppCompatActivity {
         callButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
 
-                if (!isActivated) {
-                    callerNameString = nameAutoCompleteTextView.getText().toString();
-                    callerNumberString = numberAutoCompleteTextView.getText().toString();
-                    callerRingtoneString = ringtoneAutoCompleteTextView.getText().toString();
-                    callerDelayString = delayAutoCompleteTextView.getText().toString();
-                    callerVoiceString = callerVoiceTextView.getText().toString();
+                if (!isRingerActivated) {
+                    callerNameString = nameTv.getText().toString();
+                    callerNumberString = numberTv.getText().toString();
+                    callerRingtoneString = ringtoneACTv.getText().toString();
+                    callerDelayString = delayACTv.getText().toString();
+                    callerVoiceString = voiceACTv.getText().toString();
                     vibrate = vibrateSwitch.isChecked();
 
                     SharedPreferences.Editor callPreferencesEditor = callPreferences.edit();
-                    callPreferencesEditor.putString("callerName", callerNameString);
-                    callPreferencesEditor.putString("callerNumber", callerNumberString);
-                    callPreferencesEditor.putString("callerVoice", callerVoiceString);
-                    callPreferencesEditor.putString("callerRingtone", getSelectedRingtoneUri(callerRingtoneString));
+                    callPreferencesEditor.putString(callerNameTag, callerNameString);
+                    callPreferencesEditor.putString(callerNumberTag, callerNumberString);
+//                    callPreferencesEditor.putString(callerVoiceTag, callerVoiceString);
+                    callPreferencesEditor.putString(callerVoiceTag, getAudioAssetUri(callerVoiceString));
+                    callPreferencesEditor.putString(callerRingtoneUriTag, getSelectedRingtoneUri(callerRingtoneString));
                     callPreferencesEditor.putString("callerImageFilePath", croppedImageFilePath);
-                    callPreferencesEditor.putBoolean("vibrate", vibrate);
+                    callPreferencesEditor.putBoolean(callerVibrateTag, vibrate);
 
                     callPreferencesEditor.apply();
 
                     callButton.setChecked(true);
-                    isActivated = true;
+                    isRingerActivated = true;
                     callHandler(true);
                 } else {
                     callButton.setChecked(false);
-                    isActivated = false;
+                    isRingerActivated = false;
                     callHandler(false);
                 }
             }
@@ -348,11 +513,12 @@ public class MainActivity extends AppCompatActivity {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 
                 if (vibrateSwitch.isChecked()) {
-                    vibrateSwitch.setTextColor(Color.parseColor("#1874A8"));
-                    vibrateSwitch.setTypeface(null, Typeface.NORMAL);
+                    vibrateTv.setTextColor(Color.parseColor("#1874A8"));
+                    vibrateTv.setTypeface(null, Typeface.NORMAL);
                 } else {
-                    vibrateSwitch.setTextColor(Color.parseColor("#808080"));
-                    vibrateSwitch.setTypeface(null, Typeface.ITALIC);
+                    final ColorStateList hintColor = nameTv.getHintTextColors();
+                    vibrateTv.setTextColor(hintColor);
+                    vibrateTv.setTypeface(null, Typeface.ITALIC);
                 }
             }
         });
@@ -363,41 +529,77 @@ public class MainActivity extends AppCompatActivity {
         public void onResult(int status, long timeRemaining, String sku) {
             switch (status) {
                 case STATUS_TRIAL_JUST_STARTED:
-                    trialStatus = "active";
+                    isTrialActive = true;
                     break;
                 case STATUS_TRIAL_RUNNING:
-                    trialStatus = "active";
+                    isTrialActive = true;
                     break;
                 case STATUS_TRIAL_JUST_ENDED:
-                    trialStatus = "ended";
+                    isTrialActive = false;
                     break;
                 case STATUS_TRIAL_NOT_YET_STARTED:
-                    trialStatus = "not_started";
+                    isTrialActive = null;
                     break;
                 case STATUS_TRIAL_OVER:
-                    trialStatus = "ended";
+                    isTrialActive = false;
                     break;
             }
             Log.i("TRIALY", "Returned status: " + Trialy.getStatusMessage(status));
+            Log.i("TRIALY", "Trial status string: " + isTrialActive);
+            Log.i("TRIALY", "Time left from trial: " + timeRemaining);
         }
 
     };
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        isActivated = (PendingIntent.getBroadcast(getApplicationContext(), 0, intent, PendingIntent.FLAG_NO_CREATE) != null);
 
-        if (!isActivated) {
-            callButton.setChecked(false);
+    // Listener that's called when we finish querying the items and subscriptions we own
+    IabHelper.QueryInventoryFinishedListener mGotInventoryListener = new IabHelper.QueryInventoryFinishedListener() {
+        public void onQueryInventoryFinished(IabResult result, Inventory inventory) {
+            Log.d("IAB_inventory", "Query inventory finished.");
+
+            // Have we been disposed of in the meantime? If so, quit.
+            if (mHelper == null) return;
+
+            // Is it a failure?
+            if (result.isFailure()) {
+                Log.d("IAB_inventory", "Failed to query inventory: " + result);
+                return;
+            }
+
+            Log.d("IAB_inventory", "Query inventory was successful.");
+
+            /*
+             * Check for items we own. Notice that for each purchase, we check
+             * the developer payload to see if it's correct! See
+             * verifyDeveloperPayload().
+             */
+
+            // Do we have the premium upgrade?
+            Purchase premiumPurchase = inventory.getPurchase("voice_call_pack");
+            isPremium = (premiumPurchase != null);
+            Log.d("IAB_premium_checkv", "User is " + (isPremium ? "PREMIUM" : "NOT PREMIUM"));
+            Log.d("IAB_inventory", "Initial inventory query finished; enabling main UI.");
         }
-    }
+    };
+
+    IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener
+            = new IabHelper.OnIabPurchaseFinishedListener() {
+        public void onIabPurchaseFinished(IabResult result, Purchase purchase) {
+            if (result.isFailure()) {
+                Log.d("purchaseFail", "Error purchasing: " + result);
+            } else if (purchase.getSku().equals("voice_call_pack")) {
+                isPremium = true;
+            }
+        }
+    };
+
 
     public ArrayList<String> listRingtones() {
 
         ArrayList<String> listOfRingtones = new ArrayList<>();
-        listOfRingtones.add("Select from device");
+        listOfRingtones.add(getResources().getString(R.string.select_from_device));
         listOfRingtones.add("Default");
+        listOfRingtones.add("▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔");
         RingtoneManager manager = new RingtoneManager(this);
         manager.setType(RingtoneManager.TYPE_RINGTONE);
         Cursor cursor = manager.getCursor();
@@ -435,6 +637,10 @@ public class MainActivity extends AppCompatActivity {
         return callerRingtoneUriString;
     }
 
+    public String getAudioAssetUri(String assetName) {
+        Log.i("getAUdioAsset", "URI: " + "file:///android_asset/" + assetName);
+        return "file:///android_asset/" + assetName;
+    }
 
     public void callHandler(boolean isActivated) {
 
@@ -444,6 +650,7 @@ public class MainActivity extends AppCompatActivity {
         if (isActivated) {
 
             Long triggerTime;
+            Boolean isCustomTime = false;
 
             switch (callerDelayString) {
                 case "Now":
@@ -466,6 +673,8 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 default:
 
+                    isCustomTime = true;
+
                     Calendar calendar = Calendar.getInstance();
                     calendar.set(Calendar.HOUR_OF_DAY, customSelectedHour);
                     calendar.set(Calendar.MINUTE, customSelectedMinute);
@@ -478,24 +687,31 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
-            PendingIntent pendingIntent = PendingIntent.getBroadcast(this.getApplicationContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this.getApplicationContext(), 0, ringerIntent, PendingIntent.FLAG_ONE_SHOT);
             AlarmManager alarmManager = (AlarmManager) getSystemService(ALARM_SERVICE);
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent);
             if (triggerTime == 0) {
                 Toast.makeText(this, "Incoming fake call NOW!", Toast.LENGTH_SHORT).show();
+            } else if (isCustomTime) {
+                Toast.makeText(this, "Incoming fake call at " + callerDelayString + ".", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "Incoming fake call in " + callerDelayString + ".", Toast.LENGTH_SHORT).show();
             }
         } else {
-            PendingIntent.getBroadcast(this.getApplicationContext(), 0, intent, PendingIntent.FLAG_ONE_SHOT).cancel();
+            PendingIntent.getBroadcast(this.getApplicationContext(), 0, ringerIntent, PendingIntent.FLAG_ONE_SHOT).cancel();
             Toast.makeText(this, "Fake call deactivated.", Toast.LENGTH_SHORT).show();
         }
     }
 
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        if (mHelper == null) return;
+        if (!mHelper.handleActivityResult(requestCode, resultCode, data)) {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
+
 
         if (requestCode == 1 && resultCode == RESULT_OK && data != null && data.getData() != null) {
 
@@ -512,12 +728,70 @@ public class MainActivity extends AppCompatActivity {
             int nameIndex = audioCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
             audioCursor.moveToFirst();
             String audioFileName = audioCursor.getString(nameIndex);
-            callerRingtoneUriString = audioUri.toString();
+            voiceUriString = audioUri.toString();
             audioCursor.close();
 
-            ringtoneAutoCompleteTextView.setText(audioFileName, false);
+            ringtoneACTv.setText(audioFileName, false);
 
+        } else if (requestCode == 3 && resultCode == RESULT_OK && data != null && data.getData() != null) {
+
+
+            Uri audioUri = data.getData();
+            Cursor audioCursor = getContentResolver().query(audioUri, null, null, null, null);
+            int nameIndex = audioCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+            audioCursor.moveToFirst();
+            String audioFileName = audioCursor.getString(nameIndex);
+            String audioUriString = audioUri.toString();
+            audioCursor.close();
+
+            AudioBean audioBean = new AudioBean(audioFileName, audioUriString);
+
+            voiceACTv.setText(audioBean.getFileName(), false);
         }
     }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.i("MAIN", "onDestroy");
+        try {
+            if (mHelper != null) mHelper.dispose();
+            mHelper = null;
+        } catch (IabHelper.IabAsyncInProgressException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        isRingerActivated = (PendingIntent.getBroadcast(getApplicationContext(), 0, ringerIntent, PendingIntent.FLAG_NO_CREATE) != null);
+
+        if (!isRingerActivated) {
+            callButton.setChecked(false);
+        }
+    }
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        Log.i("MAIN", "onPause");
+        Log.i("MAIN", "onPause delay: " + delayACTv.getText().toString());
+        Log.i("MAIN", "onPause vibrate state: " + vibrateSwitch.isChecked());
+
+        SharedPreferences.Editor callPreferencesEditor = callPreferences.edit();
+        callPreferencesEditor.putString(callerNameTag, nameTv.getText().toString());
+        callPreferencesEditor.putString(callerNumberTag, numberTv.getText().toString());
+        callPreferencesEditor.putString(callerVoiceTag, voiceACTv.getText().toString());
+        callPreferencesEditor.putString(callerRingtoneTag, ringtoneACTv.getText().toString());
+        callPreferencesEditor.putString(callerDelayTag, delayACTv.getText().toString());
+        callPreferencesEditor.putBoolean(callerVibrateTag, vibrateSwitch.isChecked());
+        callPreferencesEditor.apply();
+    }
+
+
 }
 
